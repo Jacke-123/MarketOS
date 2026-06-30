@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<!--
+  收藏列表页面 —— 广应科校园超市
+  展示用户收藏的商品，支持取消收藏、加入购物车、清空收藏。
+  收藏数据存储在 localStorage 中，无需登录也可查看（但加购需登录）。
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>收藏列表 - 广应科校园超市</title>
+  <link rel="stylesheet" href="css/favorites.css" />
+</head>
+<body>
+  <div class="page">
+    <div class="top-nav">
+      <h1 class="page-title">收藏列表</h1>
+      <div>
+        <a href="index.html">返回首页</a>
+        <a href="cart.html">购物车</a>
+        <a href="address.html">地址管理</a>
+      </div>
+    </div>
+    <div class="card" id="favorites-card">
+      <div id="loading" style="color:#4f6f69;">正在加载收藏...</div>
+      <div id="empty" class="favorite-empty" style="display:none;">
+        还没有收藏任何商品，去首页挑选你喜欢的商品吧。
+      </div>
+      <div id="favorites-list" class="favorite-list"></div>
+      <div class="summary" id="summary" style="display:none;">
+        <span id="favorite-count" style="font-size:16px; color:#3d5c52;"></span>
+        <button id="clear-all" type="button">清空收藏</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/favorites.js"></script>
+</body>
+</html>

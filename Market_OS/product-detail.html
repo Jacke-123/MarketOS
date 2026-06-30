@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<!--
+  商品详情页 —— 广应科校园超市
+  通过 URL 参数 id 加载商品，展示图片轮播、名称、价格、库存、描述。
+  支持数量选择、加入购物车、收藏/取消收藏。基于 Vue 3 构建。
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>商品详情 - 广应科校园超市</title>
+  <link rel="stylesheet" href="css/product-detail.css" />
+</head>
+<body>
+<div id="app">
+
+  <!-- 顶部 -->
+  <div class="top-bar">
+    <a href="index.html" class="back-btn">← 返回首页</a>
+    <div class="logo-box"><img :src="logoImage" alt="logo" style="width:40px;height:40px;border-radius:12px;box-shadow:0 10px 20px rgba(30,87,79,.12);object-fit:cover;"> 商品详情</div>
+  </div>
+
+  <!-- loading -->
+  <div v-if="loading" class="loading">⏳ 加载中…</div>
+  <div v-else-if="error" class="error-msg">{{ error }}<br><br><a href="index.html" style="color:#1e574f;">返回首页</a></div>
+
+  <!-- 详情 -->
+  <div v-else class="detail-grid">
+
+    <!-- 左：图片轮播 -->
+    <div class="image-section">
+      <div class="main-image-wrap" v-if="imageList.length > 0">
+        <img :src="imageList[currentIndex]" :alt="product.name" @error="e => e.target.src = placeholderImage" />
+        <!-- 左右箭头 -->
+        <button v-if="imageList.length > 1" class="carousel-arrow left"
+                @click="prevImage" :disabled="currentIndex === 0">‹</button>
+        <button v-if="imageList.length > 1" class="carousel-arrow right"
+                @click="nextImage" :disabled="currentIndex === imageList.length - 1">›</button>
+        <div class="img-counter" v-if="imageList.length > 1">{{ currentIndex + 1 }} / {{ imageList.length }}</div>
+      </div>
+      <div class="main-image-wrap" v-else>
+        <div class="main-image-placeholder">🛍️</div>
+      </div>
+      <!-- 缩略图 -->
+      <div class="thumb-list" v-if="imageList.length > 1">
+        <img v-for="(img, i) in imageList" :key="i"
+             :src="img" :alt="product.name + ' ' + (i+1)"
+             class="thumb" :class="{ active: currentIndex === i }"
+             @click="currentIndex = i"
+             @error="e => e.target.src = placeholderImage" />
+      </div>
+    </div>
+
+    <!-- 右：信息区 -->
+    <div class="info-section">
+      <!-- 分类 -->
+      <span class="product-category">{{ product.categoryName || '未分类' }}</span>
+
+      <!-- 名称 -->
+      <h1 class="product-title">{{ product.name }}</h1>
+
+      <!-- 价格 -->
+      <div class="product-price-lg"><span class="unit">¥</span>{{ product.price }}</div>
+
+      <!-- 状态 -->
+      <div class="meta-row">
+        <span class="stock-badge" :class="stockClass">{{ stockText }}</span>
+        <span class="status-badge" :class="product.status == 1 ? 'online' : 'offline'">
+          {{ product.status == 1 ? '已上架' : '已下架' }}
+        </span>
+      </div>
+
+      <!-- 描述 -->
+      <div class="desc-box" v-if="product.description">{{ product.description }}</div>
+
+      <!-- 数量选择 -->
+      <div class="qty-row">
+        <span class="qty-label">数量</span>
+        <button type="button" @click="decreaseQty">−</button>
+        <span class="qty-num">{{ quantity }}</span>
+        <button type="button" @click="increaseQty">+</button>
+        <span class="stock-hint" v-if="stockQuantity > 0 && stockQuantity < 10">仅剩 {{ stockQuantity }} 件</span>
+      </div>
+
+      <!-- 操作按钮 -->
+      <div class="action-buttons">
+        <button class="btn-cart"
+                :disabled="product.status != 1 || stockQuantity <= 0"
+                @click="addToCart">
+          {{ product.status != 1 ? '该商品已下架' : stockQuantity <= 0 ? '暂时缺货' : '🛒 加入购物车' }}
+        </button>
+        <button class="btn-fav" :class="{ favorited: isFavorited }" @click="toggleFavorite">
+          <span class="fav-icon">{{ isFavorited ? '❤️' : '🤍' }}</span>
+          <span>{{ isFavorited ? '已收藏' : '收藏' }}</span>
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="js/product-detail.js"></script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+﻿<!DOCTYPE html>
+<!--
+  购物车页面 —— 广应科校园超市
+  展示当前用户的购物车商品列表，支持全选、数量增减、删除、清空、结算操作。
+  结算时会弹出收货地址确认弹窗。
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>购物车 - 广应科校园超市</title>
+  <link rel="stylesheet" href="css/cart.css" />
+</head>
+<body>
+  <div class="page">
+    <div class="top-nav">
+      <h1 class="page-title">购物车</h1>
+      <div>
+        <a href="index.html">返回首页</a>
+        <a href="address.html">地址管理</a>
+      </div>
+    </div>
+    <div class="card" id="cart-card">
+      <div id="loading" style="color:#4f6f69;">正在加载购物车...</div>
+      <div id="empty" class="cart-empty" style="display:none;">
+        购物车空空如也，去首页挑选喜欢的商品吧。
+      </div>
+      <div id="cart-items" class="cart-list"></div>
+      <div class="summary" style="display:none;" id="cart-summary">
+        <label style="display:flex;align-items:center;gap:10px">
+          <input type="checkbox" id="select-all" /> 全选
+        </label>
+        <strong>总计：¥<span id="total-price">0.00</span></strong>
+        <div style="display:flex;gap:12px;align-items:center">
+          <button id="clear-button" style="background:#6e8f84">清空购物车</button>
+          <button id="checkout-button">去结算</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="addr-backdrop" id="addr-modal" style="display:none;">
+    <div class="addr-modal">
+      <h3>📍 确认收货地址</h3>
+      <div class="addr-card" id="addr-card"></div>
+      <div class="addr-actions">
+        <button class="btn-cancel" id="addr-cancel">取消</button>
+        <button class="btn-cancel" id="addr-manage" style="margin-right:auto;">📝 管理地址</button>
+        <button class="btn-ok" id="addr-confirm">✅ 确认下单</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/cart.js"></script>
+</body>
+</html>

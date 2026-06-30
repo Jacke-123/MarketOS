@@ -1,0 +1,64 @@
+﻿<!DOCTYPE html>
+<!--
+  登录/注册页面 —— 广应科校园超市
+  合并式认证页面：左侧为品牌视觉展示，右侧为登录/注册表单卡片。
+  支持用户名密码登录、新用户注册，登录后管理员自动跳转后台。
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>登录 / 注册 - 广应科校园超市</title>
+  <link rel="stylesheet" href="css/login.css" />
+</head>
+<body>
+  <div class="page-wrapper">
+    <div class="visual-panel">
+      <div class="visual-content">
+        <h2>欢迎回到 广应科校园超市</h2>
+        <p>广应科校园超市为你提供优选商品、快速配送和订单互动体验。图片与登录框融合，视觉更统一。</p>
+      </div>
+    </div>
+    <div class="form-panel">
+      <div class="auth-card">
+        <h1>登录 / 注册</h1>
+        <p>登录后即可访问广应科校园超市、管理购物车与收货地址，快速领取优惠专属商品。</p>
+        <div id="alert-box" class="alert-box"></div>
+
+        <form id="login-form" class="auth-form active">
+          <div class="form-group">
+            <input id="login-username" type="text" placeholder="用户名" autocomplete="username" />
+          </div>
+          <div class="form-group">
+            <input id="login-password" type="password" placeholder="密码" autocomplete="current-password" />
+          </div>
+          <button type="submit">登录</button>
+          <p class="form-note">还没有账号？<a href="#" id="open-register">立即注册</a></p>
+        </form>
+
+        <form id="register-form" class="auth-form">
+          <div class="form-group">
+            <input id="register-username" type="text" placeholder="用户名（字母、数字、下划线）" autocomplete="username" />
+            <span class="hint">3-20位，字母/数字/下划线，中文请填到真实姓名</span>
+          </div>
+          <div class="form-group">
+            <input id="register-password" type="password" placeholder="密码" autocomplete="new-password" />
+            <span class="hint">8-16位，可包含字母、数字和特殊字符</span>
+          </div>
+          <div class="form-group">
+            <input id="register-confirm-password" type="password" placeholder="确认密码" autocomplete="new-password" />
+            <span class="hint">请再次输入密码</span>
+          </div>
+          <div class="form-group"><input id="register-email" type="email" placeholder="邮箱（可选）" autocomplete="email" /></div>
+          <div class="form-group"><input id="register-phone" type="text" placeholder="手机号（可选）" autocomplete="tel" /></div>
+          <div class="form-group"><input id="register-realname" type="text" placeholder="真实姓名（可选）" autocomplete="name" /></div>
+          <button type="submit">注册</button>
+          <p class="form-note">已有账号？<a href="#" id="open-login">去登录</a></p>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/login.js"></script>
+</body>
+</html>

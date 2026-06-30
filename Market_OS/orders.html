@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<!--
+  我的订单页面 —— 广应科校园超市
+  展示当前用户的订单列表，支持按状态筛选（全部/待支付/已支付/已取消）、搜索、分页。
+  订单操作：查看详情、支付（需确认地址）、取消订单。
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>我的订单 - 广应科校园超市</title>
+  <link rel="stylesheet" href="css/orders.css" />
+</head>
+<body>
+  <div class="page">
+    <div class="top-nav">
+      <h1 class="page-title">📋 我的订单</h1>
+      <div>
+        <a href="index.html">返回首页</a>
+        <a href="cart.html">购物车</a>
+        <a href="favorites.html">收藏列表</a>
+        <a href="address.html">地址管理</a>
+      </div>
+    </div>
+
+    <!-- Error message -->
+    <div class="error-msg" id="error-msg" style="display:none;"></div>
+
+    <!-- Stats -->
+    <div class="stats-row" id="stats-row" style="display:none;">
+      <div class="stat-card" data-status="all" onclick="filterByStatus('all')" style="cursor:pointer;">
+        <strong id="stat-total">0</strong><span>全部订单</span>
+      </div>
+      <div class="stat-card" data-status="0" onclick="filterByStatus(0)" style="cursor:pointer;">
+        <strong id="stat-pending">0</strong><span>待支付</span>
+      </div>
+      <div class="stat-card" data-status="1" onclick="filterByStatus(1)" style="cursor:pointer;">
+        <strong id="stat-paid">0</strong><span>已支付</span>
+      </div>
+      <div class="stat-card" data-status="2" onclick="filterByStatus(2)" style="cursor:pointer;">
+        <strong id="stat-cancelled">0</strong><span>已取消</span>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="card">
+      <h2>📦 订单列表</h2>
+      <div class="toolbar">
+        <input type="text" id="search-order-id" placeholder="搜索订单号 / 订单ID / 商品名称" />
+        <button onclick="searchOrder()">🔍 查询</button>
+        <button class="secondary" onclick="loadOrders()">🔄 刷新</button>
+        <button class="secondary" onclick="clearOrders()" style="background:#fff0f0;color:#c0392b;">🗑 清空列表</button>
+      </div>
+
+      <div class="loading" id="loading">正在加载订单...</div>
+      <div class="empty-state" id="empty" style="display:none;">
+        <p>📭 暂无订单记录</p>
+        <p style="font-size:13px;">去首页选购商品，然后在购物车中结算即可创建订单。</p>
+      </div>
+
+      <div class="table-wrap" id="table-wrap" style="display:none;">
+        <table>
+          <thead>
+            <tr><th>订单ID</th><th>购买商品</th><th>金额</th><th>状态</th><th>时间</th><th>操作</th></tr>
+          </thead>
+          <tbody id="order-tbody"></tbody>
+        </table>
+      </div>
+      <div id="pagination" style="display:none;justify-content:center;gap:8px;margin-top:16px;align-items:center;"></div>
+    </div>
+  </div>
+
+  <div class="addr-backdrop" id="addr-modal" style="display:none;">
+    <div class="addr-modal">
+      <h3>确认收货地址</h3>
+      <div class="addr-card" id="addr-card"></div>
+      <div class="addr-actions">
+        <button class="btn-cancel" id="addr-cancel">取消</button>
+        <button class="btn-cancel" id="addr-manage" style="margin-right:auto;">管理地址</button>
+        <button class="btn-ok" id="addr-confirm">确认支付</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Order Items Modal -->
+  <div class="modal-backdrop" id="items-modal" style="display:none;" onclick="if(event.target===this)closeItemsModal()">
+    <div class="modal">
+      <button class="modal-close" onclick="closeItemsModal()">✕</button>
+      <h3>📋 订单明细</h3>
+      <div id="items-modal-content"></div>
+    </div>
+  </div>
+
+  <script src="js/orders.js"></script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+﻿<!DOCTYPE html>
+<!--
+  地址管理页面 —— 广应科校园超市
+  提供收货地址的新增、列表查看、默认地址设置与删除功能。
+  左侧展示已保存的地址列表，右侧为新增地址表单。
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>地址管理 - 广应科校园超市</title>
+  <link rel="stylesheet" href="css/address.css" />
+</head>
+<body>
+  <div class="page">
+    <div class="top-nav">
+      <h1 class="page-title">地址管理</h1>
+      <div>
+        <a href="index.html">返回首页</a>
+        <a href="cart.html">购物车</a>
+      </div>
+    </div>
+    <div class="layout">
+      <div class="card">
+        <h2 style="margin-top:0;">收货地址列表</h2>
+        <div id="address-list" class="address-grid"></div>
+        <div id="no-address" style="padding: 26px; color:#5a7a6f; display:none;">暂无地址，请在右侧表单中添加一个收货地址。</div>
+      </div>
+      <div class="card">
+        <h2 style="margin-top:0;">新增地址</h2>
+        <div class="form-group"><label>收货人</label><input id="receiverName" type="text" placeholder="例如：张三" /></div>
+        <div class="form-group"><label>手机号</label><input id="phone" type="text" placeholder="例如：13800001234" /></div>
+        <div class="form-group"><label>省</label><input id="province" type="text" placeholder="例如：广东省" /></div>
+        <div class="form-group"><label>市</label><input id="city" type="text" placeholder="例如：广州市" /></div>
+        <div class="form-group"><label>区/县</label><input id="district" type="text" placeholder="例如：天河区" /></div>
+        <div class="form-group"><label>详细地址</label><input id="detailAddress" type="text" placeholder="例如：大学城南门A栋401" /></div>
+        <div class="form-actions">
+          <button id="save-address">保存地址</button>
+          <button type="button" class="secondary" id="refresh-address">刷新列表</button>
+          <button type="button" id="diag-button" style="background:#6e8f84;">网络诊断</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/address.js"></script>
+</body>
+</html>

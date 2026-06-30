@@ -1,0 +1,117 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #eef6f2;
+  color: #264a45;
+}
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 20px 40px;
+}
+.top-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 18px 40px rgba(30,87,79,.08);
+  margin-bottom: 28px;
+}
+.top-nav a {
+  text-decoration: none;
+  color: #264a45;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: #f7faf8;
+  border: 1px solid #d8e6e0;
+  transition: background .22s ease;
+}
+.top-nav a:hover { background: #e5f2ec; }
+.page-title { margin: 0 0 16px; font-size: 32px; }
+.card {
+  background: white;
+  border-radius: 26px;
+  padding: 24px;
+  box-shadow: 0 24px 50px rgba(24,79,68,.08);
+}
+.cart-empty { text-align: center; color: #5b7b71; padding: 48px 0; }
+.cart-list { display: grid; gap: 18px; }
+.item-row {
+  display: grid;
+  grid-template-columns: 40px 120px 1fr 120px 110px;
+  gap: 14px;
+  align-items: center;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid #e2ece7;
+  background: #fcfffd;
+}
+.item-row img { width: 120px; height: 100px; object-fit: cover; border-radius: 18px; }
+.item-info h3 { margin: 0 0 8px; font-size: 18px; }
+.item-info p { margin: 0; color: #5e7b72; font-size: 14px; }
+.item-price { font-weight: 700; color: #c23c2f; }
+.item-actions button {
+  border: none;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: #1e574f;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+}
+.item-actions button:hover { background: #17463d; }
+.summary {
+  margin-top: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.summary strong { font-size: 20px; }
+.summary button {
+  border: none;
+  background: #1e574f;
+  color: white;
+  border-radius: 18px;
+  padding: 14px 22px;
+  cursor: pointer;
+  font-size: 16px;
+}
+.summary button:hover { background: #17463d; }
+.qty-row { display: flex; align-items: center; gap: 6px; }
+.qty-row button {
+  width: 30px; height: 30px; border-radius: 8px;
+  border: 1px solid #d7e5df; background: #f8faf8; color: #1e574f;
+  font-size: 16px; font-weight: 700; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; line-height: 1;
+}
+.qty-row button:hover { background: #e4f0ea; }
+.qty-row .qty-num { min-width: 28px; text-align: center; font-weight: 700; font-size: 16px; color: #1d3f34; }
+.addr-backdrop { position:fixed;inset:0;background:rgba(20,40,34,.35);display:flex;align-items:center;justify-content:center;z-index:99999;padding:16px; }
+.addr-modal { width:min(460px,100%);background:#fff;border-radius:22px;box-shadow:0 24px 60px rgba(20,56,45,.16);padding:26px;text-align:left; }
+.addr-modal h3 { margin:0 0 14px;font-size:18px;color:#16372f; }
+.addr-modal .addr-card { background:#f7faf8;border-radius:14px;padding:16px;margin-bottom:14px;border:1px solid #d7e7df; }
+.addr-modal .addr-card strong { display:block;margin-bottom:4px; }
+.addr-modal .addr-card span { color:#5a7267;font-size:14px; }
+.addr-modal .addr-card select { width:100%;padding:8px;border-radius:10px;border:1px solid #d7e5df;margin-top:8px; }
+.addr-field { display:flex;align-items:flex-start;gap:8px;padding:6px 0; }
+.addr-field + .addr-field { border-top:1px solid #e8efe9; }
+.addr-label { flex-shrink:0;font-weight:600;color:#1e574f;font-size:14px;min-width:90px; }
+.addr-value { color:#264a45;font-size:14px;line-height:1.5;word-break:break-all; }
+.addr-modal .addr-actions { display:flex;gap:10px;justify-content:flex-end; }
+.addr-modal .addr-actions button { border:none;border-radius:14px;padding:10px 20px;cursor:pointer;font-size:14px;font-weight:600; }
+.addr-modal .addr-actions .btn-cancel { background:#f4f8f5;color:#5a7267; }
+.addr-modal .addr-actions .btn-ok { background:#1e574f;color:#fff; }
+@media (max-width: 900px) {
+  .item-row { grid-template-columns: 1fr; }
+  .item-row img { width: 100%; height: 180px; }
+  .item-row > * { width: 100%; }
+  .summary { flex-direction: column; align-items: stretch; }
+}

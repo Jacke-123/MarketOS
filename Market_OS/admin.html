@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<!--
+  管理员后台 —— 广应科校园超市
+  基于 Vue 3 + Chart.js 的综合管理面板，包含以下模块：
+  人员管理（CRUD + 批量删除）、部门管理、薪资管理（批量发放）、
+  商品管理（状态筛选、分类管理、批量删除）、订单管理、
+  店铺管理（轮播图拖拽排序、营业数据柱状图/环形图）。
+  仅管理员角色可访问，mounted 时会校验 JWT 管理权限。
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>管理员后台 - 广应科校园超市</title>
+  <link rel="stylesheet" href="css/admin.css" />
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div>
+        <div class="brand">
+          <div class="logo-upload-wrap" @click="$refs.logoInput.click()" title="点击更换Logo">
+            <div class="logo-upload-frame">
+              <img :src="logoImage" alt="Logo">
+            </div>
+            <div class="logo-upload-overlay"></div>
+          </div>
+          <input type="file" ref="logoInput" accept="image/*" style="display:none;" @change="uploadLogo">
+          <div class="brand-text">
+            <span class="title">广应科校园超市</span>
+            <span class="sub">管理员后台</span>
+          </div>
+        </div>
+        <p>人员管理 · 部门管理 · 薪资管理 · 商品管理 · 订单管理</p>
+      </div>
+      <ul class="nav-list">
+        <li class="nav-item"><button class="active" type="button" data-section="employees">人员管理</button></li>
+        <li class="nav-item"><button type="button" data-section="departments">部门管理</button></li>
+        <li class="nav-item"><button type="button" data-section="salaries">薪资管理</button></li>
+        <li class="nav-item">
+          <button type="button" :class="{ active: section === 'products' && productMenuOpen }" data-section="products">
+            商品管理
+            <span class="nav-expand-icon" :class="{ open: productMenuOpen }">▶</span>
+          </button>
+          <ul class="sub-nav" v-cloak v-show="productMenuOpen">
+            <li><button type="button" :class="{ active: section === 'products' && productSubSection === 'list' }" @click="switchProductSub('list')">商品列表</button></li>
+            <li><button type="button" :class="{ active: section === 'products' && productSubSection === 'logs' }" @click="switchProductSub('logs')">库存变动日志</button></li>
+          </ul>
+        </li>
+        <li class="nav-item"><button type="button" data-section="orders">订单管理</button></li>
+        <li class="nav-item">
+          <button type="button" :class="{ active: section === 'shop' && shopMenuOpen }" data-section="shop">
+            店铺管理
+            <span class="nav-expand-icon" :class="{ open: shopMenuOpen }">▶</span>
+          </button>
+          <ul class="sub-nav" v-cloak v-show="shopMenuOpen">
+            <li><button type="button" :class="{ active: section === 'shop' && shopSubSection === 'carousel' }" @click="switchShopSub('carousel')">轮播图管理</button></li>
+            <li><button type="button" :class="{ active: section === 'shop' && shopSubSection === 'sales' }" @click="switchShopSub('sales')">营业数据</button></li>
+          </ul>
+        </li>
+      </ul>
+      <div class="tip">管理员建议使用最新的 Browser 或 Chrome 访问，当前页面会读取后端接口数据。</div>
+    </aside>
+
+    <main class="main">
+      <div class="header">
+        <div>
+          <div class="title">管理员后台</div>
+          <div class="desc">左侧切换页面模块。当前模块会从接口读取数据，并展示员工、部门、薪资和商品管理视图。</div>
+        </div>
+        <button class="logout-button" type="button" @click="logout">退出登录</button>
+      </div>
+
+      <div class="section-card page-employees" v-if="section === 'employees'">
+        <h2>人员管理</h2>
+        <div v-if="departmentError" style="background:#fff3cd; border:1px solid #ffc107; border-radius:12px; padding:12px 16px; margin-bottom:16px; color:#856404;">
+          部门数据加载失败，新增员工时可能无法选择部门。请点击 <a href="#" @click.prevent="loadDepartments" style="color:#1e574f;font-weight:700;">这里</a> 重试加载。
+        </div>
+        <div class="card-row">
+          <div class="stat-card"><strong>{{ employees.length }}</strong><span>当前员工总数</span></div>
+          <div class="stat-card"><strong>{{ employeeDeptCount }}</strong><span>不同部门</span></div>
+          <div class="stat-card"><strong>{{ searchEmployeeName || '全部' }}</strong><span>当前筛选</span></div>
+        </div>
+        <div class="toolbar">
+          <select v-model="searchEmployeeDept" @change="employeePage=1">
+            <option value="">全部部门</option>
+            <option v-for="dept in departments" :key="dept.id" :value="dept.name">{{ dept.name }}</option>
+          </select>
+          <input type="text" v-model="searchEmployeeName" placeholder="按姓名搜索" @keyup.enter="employeePage=1" />
+          <button type="button" @click="loadEmployees">刷新员工列表</button>
+          <button type="button" @click="showEmployeeForm">新增员工</button>
+        </div>
+        <div class="employee-form" v-if="employeeFormVisible" @input="employeeFormDirty = true" @change="employeeFormDirty = true">
+          <div class="employee-form-header">
+            <div class="form-title-area">
+              <h3>{{ editingEmployeeId ? '编辑员工信息' : '新增员工' }}</h3>
+              <div class="form-subtitle">{{ editingEmployeeId ? '修改员工 ID: ' + editingEmployeeId : '填写信息创建新员工档案' }}</div>
+            </div>
+            <button class="btn-close-form" @click="cancelEmployeeForm" title="关闭">&times;</button>
+          </div>
+
+          <div class="form-section">
+            <div class="form-section-title">基本信息</div>
+            <div class="form-row">
+              <div class="form-field">
+                <label>姓名 <span class="required-star">*</span></label>
+                <input type="text" v-model="employeeForm.realName" placeholder="请输入真实姓名" />
+                <span class="field-error" v-if="formErrors.realName">{{ formErrors.realName }}</span>
+                <span class="field-hint" v-else>员工身份证上的真实姓名</span>
+              </div>
+              <div class="form-field">
+                <label>性别 <span class="required-star">*</span></label>
+                <select v-model="employeeForm.gender">
+                  <option value="MALE">男</option>
+                  <option value="FEMALE">女</option>
+                </select>
+                <span class="field-error" v-if="formErrors.gender">{{ formErrors.gender }}</span>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-field">
+                <label>手机号 <span class="required-star">*</span></label>
+                <input type="text" v-model="employeeForm.phone" placeholder="11位手机号码" maxlength="11" />
+                <span class="field-error" v-if="formErrors.phone">{{ formErrors.phone }}</span>
+                <span class="field-hint" v-else>用于接收系统通知</span>
+              </div>
+              <div class="form-field">
+                <label>邮箱 <span class="required-star">*</span></label>
+                <input type="email" v-model="employeeForm.email" placeholder="example@mail.com" />
+                <span class="field-error" v-if="formErrors.email">{{ formErrors.email }}</span>
+                <span class="field-hint" v-else>用于接收系统邮件通知</span>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-field">
+                <label>银行卡号 <span class="required-star">*</span></label>
+                <input type="text" v-model="employeeForm.bankCardNo" placeholder="16-19位银行卡号" maxlength="19" />
+                <span class="field-error" v-if="formErrors.bankCardNo">{{ formErrors.bankCardNo }}</span>
+                <span class="field-hint" v-else>用于发放工资的银行卡号</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-section-title">工作信息</div>
+            <div class="form-row">
+              <div class="form-field">
+                <label>所属部门 <span class="required-star">*</span></label>
+                <select v-model="employeeForm.departmentId" @change="onDepartmentChange">
+                  <option :value="null">-- 请选择部门 --</option>
+                  <option v-if="departments.length === 0" :value="null" disabled>（部门数据未加载，请刷新页面后重试）</option>
+                  <option v-for="dept in departments" :key="dept.id" :value="dept.id">{{ dept.name }}</option>
+                </select>
+                <span class="field-error" v-if="formErrors.department">{{ formErrors.department }}</span>
+                <span class="field-hint" v-else>员工所属的组织部门</span>
+              </div>
+              <div class="form-field">
+                <label>职位 <span class="required-star">*</span></label>
+                <input type="text" v-model="employeeForm.position" placeholder="例如：收银员、经理" />
+                <span class="field-error" v-if="formErrors.position">{{ formErrors.position }}</span>
+                <span class="field-hint">员工的岗位名称</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-section-title">薪资信息（用于自动生成当月薪资记录）</div>
+            <div class="form-row">
+              <div class="form-field">
+                <label>基本薪资 <span class="required-star">*</span></label>
+                <input type="number" v-model.number="employeeForm.baseSalary" placeholder="0.00" step="0.01" min="0" />
+                <span class="field-error" v-if="formErrors.baseSalary">{{ formErrors.baseSalary }}</span>
+                <span class="field-hint" v-else>月基本工资（元）</span>
+              </div>
+              <div class="form-field">
+                <label>绩效奖金</label>
+                <input type="number" v-model.number="employeeForm.performanceBonus" placeholder="0.00" step="0.01" min="0" />
+                <span class="field-hint">月度绩效奖金（元）</span>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-field">
+                <label>津贴</label>
+                <input type="number" v-model.number="employeeForm.allowance" placeholder="0.00" step="0.01" min="0" />
+                <span class="field-error" v-if="formErrors.allowance">{{ formErrors.allowance }}</span>
+                <span class="field-hint" v-else>餐补、交通等（元）</span>
+              </div>
+              <div class="form-field">
+                <label>扣款</label>
+                <input type="number" v-model.number="employeeForm.deduction" placeholder="0.00" step="0.01" min="0" />
+                <span class="field-hint">迟到、缺勤等扣款（元）</span>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-field">
+                <label>社保</label>
+                <input type="number" v-model.number="employeeForm.socialSecurity" placeholder="0.00" step="0.01" min="0" />
+                <span class="field-hint">个人社保缴纳（元）</span>
+              </div>
+              <div class="form-field">
+                <label>个税</label>
+                <input type="number" v-model.number="employeeForm.tax" placeholder="0.00" step="0.01" min="0" />
+                <span class="field-hint">个人所得税（元）</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn-secondary" @click="cancelEmployeeForm">取消</button>
+            <button type="button" class="btn-primary" @click="createEmployee" :disabled="submitLoading">
+              <span v-if="submitLoading" class="btn-spinner"></span>
+              {{ submitLoading ? '提交中...' : (editingEmployeeId ? '保存修改' : '确认新增') }}
+            </button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th><input type="checkbox" @change="toggleSelectAllEmployees" :checked="selectedEmployees.length === paginatedEmployees.length && paginatedEmployees.length > 0" /></th>
+                <th>员工编号</th>
+                <th>姓名</th>
+                <th>部门</th>
+                <th>部门ID</th>
+                <th>职位</th>
+                <th>基本薪资</th>
+                <th>手机</th>
+                <th>邮箱</th>
+                <th>操作</th>
+              </tr>
+              <tr v-if="selectedEmployees.length > 0" class="batch-action-row">
+                <th :colspan="10">
+                  <div class="batch-action-bar">
+                    <div class="batch-left-group">
+                      <span class="batch-info">已选择 <strong>{{ selectedEmployees.length }}</strong> 名员工</span>
+                      <span class="batch-sep"></span>
+                      <span class="batch-actions">
+                        <button class="btn-batch-delete" @click="confirmBatchDeleteEmployees">批量删除</button>
+                      </span>
+                    </div>
+                    <button class="btn-batch-clear" @click="selectedEmployees = []">取消选择</button>
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in paginatedEmployees" :key="item.id">
+                <td><input type="checkbox" :value="item.id" v-model="selectedEmployees" /></td>
+                <td>{{ item.employeeNo || '-' }}</td>
+                <td>{{ item.realName }}</td>
+                <td>{{ item.department || '-' }}</td>
+                <td>{{ item.departmentId || getDepartmentIdByName(item.department) || '-' }}</td>
+                <td>{{ item.position || '-' }}</td>
+                <td>{{ item.baseSalary != null ? '¥' + Number(item.baseSalary).toFixed(2) : '-' }}</td>
+                <td>{{ item.phone || '-' }}</td>
+                <td>{{ item.email || '-' }}</td>
+                <td class="actions">
+                  <button type="button" @click="viewEmployee(item)">查看</button>
+                  <button type="button" @click="editEmployee(item)">编辑</button>
+                  <button type="button" @click="viewEmployeeSalary(item)">薪资</button>
+                </td>
+              </tr>
+              <tr v-if="filteredEmployees.length === 0"><td colspan="10" style="padding: 22px 12px; color: #5b7267;">暂无员工数据，可点击刷新获取。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagelist" v-if="employeeTotalPages > 1">
+          <button @click="employeePage=1" :disabled="employeePage<=1">首页</button>
+          <button @click="employeePage--" :disabled="employeePage<=1">上一页</button>
+          <span>第 {{ employeePage }} / {{ employeeTotalPages }} 页（共 {{ filteredEmployees.length }} 条）</span>
+          <button @click="employeePage++" :disabled="employeePage>=employeeTotalPages">下一页</button>
+          <button @click="employeePage=employeeTotalPages" :disabled="employeePage>=employeeTotalPages">末页</button>
+        </div>
+      </div>
+
+      <div class="section-card page-departments" v-if="section === 'departments'">
+        <h2>部门管理</h2>
+        <div v-if="departmentError" style="background:#fff3cd; border:1px solid #ffc107; border-radius:12px; padding:12px 16px; margin-bottom:16px; color:#856404;">
+          部门数据加载失败，请确认后端服务已启动。点击 <a href="#" @click.prevent="loadDepartments" style="color:#1e574f;font-weight:700;">刷新部门列表</a> 重试。
+        </div>
+        <div class="card-row">
+          <div class="stat-card"><strong>{{ departments.length }}</strong><span>当前部门总数</span></div>
+          <div class="stat-card"><strong>{{ departments.filter(d => d.name).slice(0,3).map(d => d.name).join('、') || '暂无' }}</strong><span>预设部门</span></div>
+          <div class="stat-card"><strong>{{ employeeDeptCount }}</strong><span>员工覆盖部门</span></div>
+        </div>
+        <div class="toolbar">
+          <button type="button" @click="loadDepartments">刷新部门列表</button>
+          <button type="button" @click="showDepartmentForm">新增部门</button>
+        </div>
+        <div class="employee-form" v-if="departmentFormVisible" @input="departmentFormDirty = true" @change="departmentFormDirty = true">
+          <h3>{{ editingDepartmentId ? '编辑部门' : '新增部门' }}</h3>
+          <div class="form-row">
+            <input type="text" v-model="departmentForm.name" placeholder="部门名称" />
+            <input type="text" v-model="departmentForm.description" placeholder="部门描述" />
+          </div>
+          <div class="form-actions">
+            <button type="button" @click="submitDepartmentForm">提交</button>
+            <button type="button" class="secondary" @click="cancelDepartmentForm">取消</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th><input type="checkbox" @change="toggleSelectAllDepartments" :checked="selectedDepartments.length === paginatedDepartments.length && paginatedDepartments.length > 0" /></th>
+                <th>部门ID</th>
+                <th>部门名称</th>
+                <th>部门描述</th>
+                <th>人数</th>
+                <th>创建时间</th>
+                <th>修改时间</th>
+                <th>操作</th>
+              </tr>
+              <tr v-if="selectedDepartments.length > 0" class="batch-action-row">
+                <th :colspan="8">
+                  <div class="batch-action-bar">
+                    <div class="batch-left-group">
+                      <span class="batch-info">已选择 <strong>{{ selectedDepartments.length }}</strong> 个部门</span>
+                      <span class="batch-sep"></span>
+                      <span class="batch-actions">
+                        <button class="btn-batch-delete" @click="confirmBatchDeleteDepartments">批量删除</button>
+                      </span>
+                    </div>
+                    <button class="btn-batch-clear" @click="selectedDepartments = []">取消选择</button>
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in paginatedDepartments" :key="item.id">
+                <td><input type="checkbox" :value="item.id" v-model="selectedDepartments" /></td>
+                <td>{{ item.id }}</td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.description || '-' }}</td>
+                <td>{{ item.employeeCount != null ? item.employeeCount : 0 }}</td>
+                <td>{{ item.createdAt ? item.createdAt.replace('T', ' ').substring(0, 19) : '-' }}</td>
+                <td>{{ item.updatedAt ? item.updatedAt.replace('T', ' ').substring(0, 19) : '-' }}</td>
+                <td class="actions">
+                  <button type="button" @click="editDepartment(item)">编辑</button>
+                  <button type="button" @click="deleteDepartment(item)">删除</button>
+                </td>
+              </tr>
+              <tr v-if="departments.length === 0"><td colspan="8" style="padding: 22px 12px; color: #5b7267;">暂无部门数据，可点击刷新获取。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagelist" v-if="departmentTotalPages > 1">
+          <button @click="departmentPage=1" :disabled="departmentPage<=1">首页</button>
+          <button @click="departmentPage--" :disabled="departmentPage<=1">上一页</button>
+          <span>第 {{ departmentPage }} / {{ departmentTotalPages }} 页（共 {{ departments.length }} 条）</span>
+          <button @click="departmentPage++" :disabled="departmentPage>=departmentTotalPages">下一页</button>
+          <button @click="departmentPage=departmentTotalPages" :disabled="departmentPage>=departmentTotalPages">末页</button>
+        </div>
+      </div>
+
+      <div class="section-card page-salaries" v-if="section === 'salaries'">
+        <h2>薪资管理</h2>
+        <div class="card-row">
+          <div class="stat-card"><strong>{{ salaryRecords.length }}</strong><span>薪资记录条数</span></div>
+          <div class="stat-card"><strong>{{ selectedEmployeeName || '未选择' }}</strong><span>当前员工</span></div>
+          <div class="stat-card"><strong>{{ salaryMonth }}</strong><span>查询月份</span></div>
+        </div>
+        <div class="toolbar">
+          <input type="number" v-model.number="salaryEmployeeId" placeholder="员工ID" min="1" />
+          <input type="text" v-model="salaryMonth" placeholder="年月（YYYY-MM）" />
+          <button type="button" @click="loadSalaryQuery">查询薪资</button>
+          <button type="button" @click="loadSalaryAll">刷新薪资列表</button>
+          <button type="button" @click="showSalaryForm">新增薪资记录</button>
+        </div>
+        <div class="employee-form" v-if="salaryFormVisible">
+          <div class="employee-form-header">
+            <div class="form-title-area">
+              <h3>{{ editingSalaryId ? '编辑薪资记录' : '新增薪资记录' }}</h3>
+              <div class="form-subtitle">{{ editingSalaryId ? '修改薪资记录 ID: ' + editingSalaryId : '填写信息创建薪资记录' }}</div>
+            </div>
+            <button class="btn-close-form" @click="cancelSalaryForm" title="关闭">&times;</button>
+          </div>
+
+          <div class="form-section">
+            <div class="form-section-title">基本信息</div>
+            <div class="form-row">
+              <div class="form-field">
+                <label>员工ID <span class="required-star">*</span></label>
+                <input type="number" v-model.number="salaryForm.employeeId" placeholder="输入员工ID" min="1" />
+                <span class="field-error" v-if="salaryFormErrors.employeeId">{{ salaryFormErrors.employeeId }}</span>
+                <span class="field-hint" v-else>关联的员工唯一标识</span>
+              </div>
+              <div class="form-field">
+                <label>薪资月份 <span class="required-star">*</span></label>
+                <input type="text" v-model="salaryForm.yearMonth" placeholder="例如：2026-06" />
+                <span class="field-error" v-if="salaryFormErrors.yearMonth">{{ salaryFormErrors.yearMonth }}</span>
+                <span class="field-hint" v-else>格式：YYYY-MM，表示该月薪资</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-section-title">薪资构成（实发 = 基本 + 绩效 + 津贴 - 扣款 - 社保 - 个税）</div>
+            <div class="form-row">
+              <div class="form-field">
+                <label>基本工资 <span class="required-star">*</span></label>
+                <input type="number" v-model.number="salaryForm.baseSalary" placeholder="0.00" step="0.01" min="0" @input="calcSalaryFormActual" />
+                <span class="field-error" v-if="salaryFormErrors.baseSalary">{{ salaryFormErrors.baseSalary }}</span>
+                <span class="field-hint" v-else>月基本工资金额（元）</span>
+              </div>
+              <div class="form-field">
+                <label>绩效奖金</label>
+                <input type="number" v-model.number="salaryForm.performanceBonus" placeholder="0.00" step="0.01" min="0" @input="calcSalaryFormActual" />
+                <span class="field-hint">月度绩效奖金（元）</span>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-field">
+                <label>津贴</label>
+                <input type="number" v-model.number="salaryForm.allowance" placeholder="0.00" step="0.01" min="0" @input="calcSalaryFormActual" />
+                <span class="field-hint">餐补、交通等津贴（元）</span>
+              </div>
+              <div class="form-field">
+                <label>扣款</label>
+                <input type="number" v-model.number="salaryForm.deduction" placeholder="0.00" step="0.01" min="0" @input="calcSalaryFormActual" />
+                <span class="field-hint">迟到、缺勤等扣款（元）</span>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-field">
+                <label>社保</label>
+                <input type="number" v-model.number="salaryForm.socialSecurity" placeholder="0.00" step="0.01" min="0" @input="calcSalaryFormActual" />
+                <span class="field-hint">个人社保缴纳金额（元）</span>
+              </div>
+              <div class="form-field">
+                <label>个税</label>
+                <input type="number" v-model.number="salaryForm.tax" placeholder="0.00" step="0.01" min="0" @input="calcSalaryFormActual" />
+                <span class="field-hint">个人所得税（元）</span>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-field">
+                <label>实发工资 <span class="optional-tag">自动</span></label>
+                <input type="number" v-model.number="salaryForm.actualSalary" placeholder="后端自动计算" step="0.01" min="0" readonly :class="{ 'highlight-updated': salaryFormActualHighlight }" />
+                <span class="field-hint">后端根据薪资构成自动计算，无需手动填写</span>
+              </div>
+              <div class="form-field">
+                <label>发放日期</label>
+                <input type="date" v-model="salaryForm.paymentDate" />
+                <span class="field-hint">实际工资发放的年月日</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-section-title">状态与备注</div>
+            <div class="form-row">
+              <div class="form-field">
+                <label>发放状态</label>
+                <select v-model="salaryForm.status">
+                  <option value="PENDING">待发放</option>
+                  <option value="PAID">已发放</option>
+                </select>
+                <span class="field-hint">当前薪资的发放状态</span>
+              </div>
+              <div class="form-field">
+                <label>备注</label>
+                <input type="text" v-model="salaryForm.remark" placeholder="其他备注信息（可选）" />
+                <span class="field-hint">选填，可记录特殊情况</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn-secondary" @click="cancelSalaryForm">取消</button>
+            <button type="button" class="btn-primary" @click="submitSalaryForm" :disabled="salarySubmitLoading">
+              <span v-if="salarySubmitLoading" class="btn-spinner"></span>
+              {{ salarySubmitLoading ? '提交中...' : (editingSalaryId ? '保存修改' : '确认新增') }}
+            </button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th><input type="checkbox" @change="toggleSelectAllSalaries" :checked="selectedSalaries.length === paginatedSalaries.length && paginatedSalaries.length > 0" /></th>
+                <th>记录ID</th>
+                <th>员工编号</th>
+                <th>员工姓名</th>
+                <th>部门</th>
+                <th>部门ID</th>
+                <th>年月</th>
+                <th>基本工资</th>
+                <th>绩效</th>
+                <th>津贴</th>
+                <th>扣款</th>
+                <th>社保</th>
+                <th>个税</th>
+                <th>实发工资</th>
+                <th>状态</th>
+                <th>支付日期</th>
+                <th>备注</th>
+                <th>操作</th>
+              </tr>
+              <tr v-if="selectedSalaries.length > 0" class="batch-action-row">
+                <th :colspan="17">
+                  <div class="batch-action-bar">
+                    <div class="batch-left-group">
+                      <span class="batch-info">已选择 <strong>{{ selectedSalaries.length }}</strong> 条记录</span>
+                      <span class="batch-sep"></span>
+                      <span class="batch-actions">
+                        <button class="btn-batch-pay" @click="confirmBatchPay">批量发放</button>
+                        <button class="btn-batch-delete" @click="confirmBatchDeleteSalaries">批量删除</button>
+                      </span>
+                    </div>
+                    <button class="btn-batch-clear" @click="selectedSalaries = []">取消选择</button>
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in paginatedSalaries" :key="item.id">
+                <td><input type="checkbox" :value="item.id" v-model="selectedSalaries" /></td>
+                <td>{{ item.id }}</td>
+                <td>{{ item.employeeNo || '-' }}</td>
+                <td>{{ item.employeeName || getEmployeeNameById(item.employeeId) || '-' }}</td>
+                <td>{{ item.employeeDepartment || '-' }}</td>
+                <td>{{ getDepartmentIdByEmployeeId(item.employeeId) || '-' }}</td>
+                <td>{{ item.yearMonth }}</td>
+                <td>¥{{ Number(item.baseSalary || 0).toFixed(2) }}</td>
+                <td>¥{{ Number(item.performanceBonus || 0).toFixed(2) }}</td>
+                <td>¥{{ Number(item.allowance || 0).toFixed(2) }}</td>
+                <td>¥{{ Number(item.deduction || 0).toFixed(2) }}</td>
+                <td>¥{{ Number(item.socialSecurity || 0).toFixed(2) }}</td>
+                <td>¥{{ Number(item.tax || 0).toFixed(2) }}</td>
+                <td>¥{{ Number(item.actualSalary || 0).toFixed(2) }}</td>
+                <td><span class="status-pill">{{ item.status === 'PAID' ? '已发放' : '待发放' }}</span></td>
+                <td>{{ item.paymentDate ? item.paymentDate.split('T')[0] : '-' }}</td>
+                <td>{{ item.remark || '-' }}</td>
+                <td class="actions">
+                  <button type="button" @click="showSalaryForm(item)">编辑</button>
+                  <button type="button" class="secondary" @click="deleteSalaryRecord(item)">删除</button>
+                </td>
+              </tr>
+              <tr v-if="salaryRecords.length === 0"><td colspan="17" style="padding: 22px 12px; color: #5b7267;">暂无薪资记录。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagelist" v-if="salaryTotalPages > 1">
+          <button @click="salaryPage=1" :disabled="salaryPage<=1">首页</button>
+          <button @click="salaryPage--" :disabled="salaryPage<=1">上一页</button>
+          <span>第 {{ salaryPage }} / {{ salaryTotalPages }} 页（共 {{ salaryRecords.length }} 条）</span>
+          <button @click="salaryPage++" :disabled="salaryPage>=salaryTotalPages">下一页</button>
+          <button @click="salaryPage=salaryTotalPages" :disabled="salaryPage>=salaryTotalPages">末页</button>
+        </div>
+      </div>
+
+      <div class="section-card page-shop" v-if="section === 'shop'">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+          <h2 style="margin:0;">{{ shopSubSection === 'sales' ? '营业数据' : '店铺管理 - 首页轮播图' }}</h2>
+        </div>
+
+        <!-- 轮播图管理 -->
+        <div v-if="shopSubSection === 'carousel'">
+          <p style="color:#5b736d; margin-bottom:12px;">拖动左侧手柄排序，右侧预览效果与首页一致。修改自动保存。</p>
+          <div class="card-row">
+            <div class="stat-card"><strong>{{ carouselImages.length }}</strong><span>轮播图数量</span></div>
+            <div class="stat-card"><strong>{{ carouselImages.filter(c => c.url).length }}</strong><span>已设图片</span></div>
+            <div class="stat-card"><strong @click="resetCarousel" style="cursor:pointer;color:#1e574f;">重置</strong><span>恢复默认</span></div>
+          </div>
+          <div v-for="(item, index) in carouselImages" :key="item.id"
+            draggable="true"
+            @dragstart="onDragStart($event, index)"
+            @dragover.prevent="onDragOver($event, index)"
+            @drop="onDrop($event, index)"
+            :style="{ display:'grid', gridTemplateColumns:'36px 1fr 1fr', gap:'14px', background: dragIndex === index ? '#e8f5ee' : '#f9fdfb', border: dragIndex === index ? '2px dashed #1e574f' : '1px solid #e0ede6', borderRadius:'18px', padding:'16px 18px', marginBottom:'12px', cursor:'grab', transition:'all .2s', opacity: dragIndex === index ? 0.6 : 1 }">
+            <div style="display:flex; align-items:center; justify-content:center; color:#aaa; font-size:20px; user-select:none;" title="拖动排序">⠿</div>
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <strong style="color:#15503f; font-size:16px;">轮播图 #{{ index + 1 }}</strong>
+                <button type="button" v-if="carouselImages.length > 1" @click="removeCarouselSlide(index)" style="background:none; border:none; color:#c0392b; cursor:pointer; font-size:18px; padding:0 4px;" title="删除此轮播图">✕</button>
+              </div>
+              <div style="margin-bottom:8px;">
+                <input type="text" v-model="item.title" placeholder="标题" style="width:100%; padding:10px 12px; border:1px solid #d7e5df; border-radius:12px; background:#fff; color:#1e4237;" @change="saveCarousel" />
+              </div>
+              <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                <input type="color" v-model="item.bg" style="width:36px; height:36px; border:none; border-radius:8px; cursor:pointer; padding:0;" @change="saveCarousel" />
+                <input type="text" v-model="item.bg" placeholder="#e8f5e9" style="flex:1; padding:10px 12px; border:1px solid #d7e5df; border-radius:12px; background:#fff; color:#1e4237;" @change="saveCarousel" />
+              </div>
+              <div style="display:flex; gap:8px;">
+                <button type="button" @click="pickCarouselImage(index)" style="border-radius:10px; padding:8px 16px; background:#1e574f; color:#fff; border:none; cursor:pointer; font-size:13px;">选择图片</button>
+                <button type="button" v-if="item.url" @click="removeCarouselImage(index)" style="border-radius:10px; padding:8px 12px; background:#fff; color:#c0392b; border:1px solid #e0c0c0; cursor:pointer; font-size:12px;">移除图片</button>
+              </div>
+            </div>
+            <div :style="{ background: item.bg || '#e0e0e0', borderRadius:'14px', minHeight:'180px', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', position:'relative' }">
+              <img v-if="item.url" :src="item.url" style="width:100%; height:100%; object-fit:cover; position:absolute; inset:0;" />
+              <span :style="{ color: item.url ? '#fff' : '#666', fontSize: item.url ? '20px' : '14px', fontWeight: item.url ? 700 : 400, zIndex:1, textShadow: item.url ? '0 2px 8px rgba(0,0,0,.5)' : 'none', position: item.url ? 'absolute' : 'static', bottom: item.url ? '14px' : 'auto' }">{{ item.title || '轮播图 #' + (index + 1) }}</span>
+            </div>
+          </div>
+          <div style="display:flex; gap:12px; margin-top:8px;">
+            <button type="button" @click="addCarouselSlide" style="border-radius:14px; padding:12px 22px; background:#fff; color:#1e574f; border:2px dashed #1e574f; cursor:pointer; font-size:15px; font-weight:600;">＋ 新增轮播图</button>
+            <span style="font-size:13px; color:#999; align-self:center;">拖动左侧 ⠿ 手柄排序</span>
+          </div>
+          <p v-if="carouselSavedMsg" style="margin-top:8px; color:#1e574f; font-weight:600; font-size:14px;">{{ carouselSavedMsg }}</p>
+        </div>
+
+        <!-- 营业数据 -->
+        <div v-show="shopSubSection === 'sales'" key="sales-section">
+          <div class="card-row-four">
+            <div class="stat-card"><strong>¥{{ salesTotalRevenue.toFixed(2) }}</strong><span>累计营业额</span></div>
+            <div class="stat-card"><strong>{{ salesTotalOrders }}</strong><span>总订单数</span></div>
+            <div class="stat-card"><strong>¥{{ salesAvgRevenue }}</strong><span>月均营业额</span></div>
+            <div class="stat-card"><strong>{{ salesPaidOrders }}</strong><span>已完成订单</span></div>
+          </div>
+          <p v-if="salesDateRange" style="color:#96ada2;font-size:12px;margin:0 0 8px;">统计周期 {{ salesDateRange }}</p>
+          <div style="display:grid; grid-template-columns: 1fr 2fr; gap:16px; margin-top:16px;">
+            <div style="background:#fff; border-radius:16px; padding:20px; border:1px solid #e5ece8; display:flex; align-items:center; justify-content:center; min-height:320px;">
+              <canvas id="salesDoughnut"></canvas>
+            </div>
+            <div style="background:#fff; border-radius:14px; padding:24px 20px 20px; border:1px solid #e8efeb; min-height:360px; box-shadow:0 1px 3px rgba(0,0,0,.04);">
+              <canvas id="salesChart"></canvas>
+            </div>
+          </div>
+          <!-- 年份折叠菜单 -->
+          <div style="margin-top:16px;">
+            <div v-if="yearlySalesData.length === 0" style="text-align:center;color:#999;padding:30px;">暂无销售数据</div>
+            <div v-for="year in yearlySalesData" :key="year.year" style="margin-bottom:8px;border-radius:14px;overflow:hidden;border:1px solid #e0ebe5;">
+              <!-- 年份标题栏 -->
+              <div @click="toggleYear(year.year)" style="display:flex;justify-content:space-between;align-items:center;padding:13px 22px;background:#f8faf9;cursor:pointer;user-select:none;border-bottom:1px solid transparent;transition:background .15s;"
+                   :style="expandedYear === year.year ? { background: '#eef5f1', borderBottomColor: '#dce8e1' } : {}">
+                <div style="display:flex;align-items:baseline;gap:16px;">
+                  <span style="font-size:15px;font-weight:700;color:#1e574f;">{{ year.label }}</span>
+                  <span style="font-size:12px;color:#7a9a90;">{{ year.order_count }} 笔订单</span>
+                  <span style="font-size:13px;color:#c23c2f;font-weight:600;">&yen; {{ Number(year.total_revenue).toLocaleString('zh-CN', {minimumFractionDigits: 2}) }}</span>
+                </div>
+                <span style="font-size:12px;color:#b0c5b8;transition:transform .2s;" :style="{ transform: expandedYear === year.year ? 'rotate(90deg)' : 'rotate(0deg)' }">&#9654;</span>
+              </div>
+              <!-- 月份列表 -->
+              <div v-if="expandedYear === year.year">
+                <div v-for="(mon, mi) in year.months" :key="year.year + '-' + mon.month"
+                     :style="{ borderTop: mi > 0 ? '1px solid #edf3ef' : 'none' }">
+                  <div @click="toggleMonth(year.year + '-' + mon.month)" style="display:flex;justify-content:space-between;align-items:center;padding:9px 22px 9px 42px;cursor:pointer;user-select:none;transition:background .12s;"
+                       :style="expandedMonth === year.year + '-' + mon.month ? { background: '#f3f8f5' } : {}">
+                    <div style="display:flex;align-items:baseline;gap:14px;">
+                      <span style="font-size:14px;font-weight:600;color:#2d5a4e;">{{ mon.label }}</span>
+                      <span style="font-size:12px;color:#8aa398;">{{ mon.order_count }} 单</span>
+                      <span style="font-size:12px;color:#c23c2f;">&yen; {{ Number(mon.total_revenue).toLocaleString('zh-CN', {minimumFractionDigits: 2}) }}</span>
+                    </div>
+                    <span style="font-size:11px;color:#bccfc4;transition:transform .2s;" :style="{ transform: expandedMonth === year.year + '-' + mon.month ? 'rotate(90deg)' : 'rotate(0deg)' }">&#9654;</span>
+                  </div>
+                  <!-- 每日明细 -->
+                  <div v-if="expandedMonth === year.year + '-' + mon.month" style="padding:0 22px 10px 42px;">
+                    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                      <thead>
+                        <tr style="border-bottom:2px solid #e4ede8;">
+                          <th style="padding:7px 12px;text-align:left;font-weight:600;color:#5b7267;">日期</th>
+                          <th style="padding:7px 12px;text-align:left;font-weight:600;color:#5b7267;">星期</th>
+                          <th style="padding:7px 12px;text-align:right;font-weight:600;color:#5b7267;">订单数</th>
+                          <th style="padding:7px 12px;text-align:right;font-weight:600;color:#5b7267;">营业额</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="d in mon.days" :key="d.date" style="border-bottom:1px solid #f3f7f4;">
+                          <td style="padding:6px 12px;font-weight:500;color:#264a45;">{{ d.label }}</td>
+                          <td style="padding:6px 12px;color:#6b8478;">{{ d.weekday }}</td>
+                          <td style="padding:6px 12px;text-align:right;color:#3d5e52;">{{ d.order_count }}</td>
+                          <td style="padding:6px 12px;text-align:right;font-weight:600;color:#c23c2f;">&yen; {{ Number(d.total_revenue).toFixed(2) }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-card page-orders" v-if="section === 'orders'">
+        <h2>订单管理</h2>
+        <div class="card-row-four">
+          <div class="stat-card" @click="orderStatusFilter = ''; orderPage = 1" style="cursor:pointer;" :style="{boxShadow: orderStatusFilter === '' ? '0 0 0 2px #1e574f' : ''}"><strong>{{ orders.length }}</strong><span>全部订单</span></div>
+          <div class="stat-card" @click="orderStatusFilter = 0; orderPage = 1" style="cursor:pointer;" :style="{boxShadow: orderStatusFilter === 0 ? '0 0 0 2px #e65100' : ''}"><strong>{{ orders.filter(o => o.status === 0).length }}</strong><span>待支付</span></div>
+          <div class="stat-card" @click="orderStatusFilter = 1; orderPage = 1" style="cursor:pointer;" :style="{boxShadow: orderStatusFilter === 1 ? '0 0 0 2px #2e7d32' : ''}"><strong>{{ orders.filter(o => o.status === 1).length }}</strong><span>已支付</span></div>
+          <div class="stat-card" @click="orderStatusFilter = 2; orderPage = 1" style="cursor:pointer;" :style="{boxShadow: orderStatusFilter === 2 ? '0 0 0 2px #757575' : ''}"><strong>{{ orders.filter(o => o.status === 2).length }}</strong><span>已取消</span></div>
+        </div>
+        <div class="toolbar">
+          <input type="text" v-model="orderSearchText" placeholder="搜索订单号/ID/商品名称/用户ID" @keyup.enter="orderPage=1" />
+          <button type="button" @click="loadAllOrders">刷新订单列表</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>订单ID</th><th>用户ID</th><th>购买商品</th><th>金额</th><th>状态</th><th>时间</th><th>操作</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in paginatedOrders" :key="item.id">
+                <td>#{{ item.id }}</td>
+                <td>{{ item.userId }}</td>
+                <td style="max-width:180px;font-size:13px;">{{ getOrderProductSummary(item.id) || '(加载中…)' }}</td>
+                <td style="font-weight:700;color:#c23c2f;">¥{{ item.totalAmount != null ? Number(item.totalAmount).toFixed(2) : '0.00' }}</td>
+                <td>
+                  <span class="status-pill" v-if="item.status === 0" style="background:#fff3e0;color:#e65100;">待支付</span>
+                  <span class="status-pill" v-else-if="item.status === 1" style="background:#e8f5e9;color:#2e7d32;">已支付</span>
+                  <span class="status-pill" v-else-if="item.status === 2" style="background:#f5f5f5;color:#757575;">已取消</span>
+                  <span class="status-pill" v-else>未知</span>
+                </td>
+                <td>{{ item.createTime ? item.createTime.replace('T', ' ').substring(0, 19) : '-' }}</td>
+                <td class="actions">
+                  <button type="button" @click="viewAdminOrderItems(item)">详情</button>
+                  <button type="button" @click="cancelAdminOrder(item)" v-if="item.status === 0" style="background:#fff0f0;color:#c0392b;">取消订单</button>
+                </td>
+              </tr>
+              <tr v-if="filteredOrders.length === 0"><td colspan="7" style="padding:22px;color:#5b7267;">暂无订单数据</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagelist" v-if="orderTotalPages > 1">
+          <button @click="orderPage=1" :disabled="orderPage<=1">首页</button>
+          <button @click="orderPage--" :disabled="orderPage<=1">上一页</button>
+          <span style="padding:0 8px;">第 {{ orderPage }} / {{ orderTotalPages }} 页（共 {{ filteredOrders.length }} 条）</span>
+          <button @click="orderPage++" :disabled="orderPage>=orderTotalPages">下一页</button>
+          <button @click="orderPage=orderTotalPages" :disabled="orderPage>=orderTotalPages">末页</button>
+        </div>
+      </div>
+
+      <!-- Order Items Modal (Admin) -->
+      <div class="modal-backdrop" v-cloak v-if="adminOrderItemsModalVisible" @click.self="adminOrderItemsModalVisible = false" style="position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;">
+        <div style="background:#fff;border-radius:24px;padding:28px;max-width:700px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 30px 60px rgba(0,0,0,.18);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+            <h3 style="margin:0;font-size:20px;color:#16372f;">订单 #{{ adminOrderItemsOrderId }}</h3>
+            <div style="font-size:13px;color:#999;margin-top:4px;font-family:monospace;">编号：{{ adminOrderOrderNo }}</div>
+            <button @click="adminOrderItemsModalVisible = false" style="background:none;border:none;font-size:24px;cursor:pointer;color:#999;">✕</button>
+          </div>
+          <div style="background:#f8faf9;border-radius:12px;padding:14px 18px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;font-size:14px;">
+            <div><span style="color:#8a9e96;">收货人</span> <span style="color:#1d3f34;font-weight:600;">{{ adminOrderReceiverName || '-' }}</span></div>
+            <div><span style="color:#8a9e96;">电话</span> <span style="color:#1d3f34;font-weight:600;">{{ adminOrderPhone || '-' }}</span></div>
+            <div style="grid-column:1/-1;"><span style="color:#8a9e96;">地址</span> <span style="color:#1d3f34;font-weight:600;">{{ adminOrderAddress || '-' }}</span></div>
+          </div>
+          <div v-if="adminOrderItemsLoading" style="text-align:center;color:#999;">加载中...</div>
+          <table v-else>
+            <thead>
+              <tr>
+                <th>商品名称</th>
+                <th>商品ID</th>
+                <th>单价</th>
+                <th>数量</th>
+                <th>小计</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in adminOrderItems" :key="item.id">
+                <td>{{ item.productName || '商品#' + item.productId }}</td>
+                <td>{{ item.productId }}</td>
+                <td>¥{{ item.unitPrice != null ? Number(item.unitPrice).toFixed(2) : '-' }}</td>
+                <td>{{ item.quantity }}</td>
+                <td style="font-weight:700;color:#c23c2f;">¥{{ item.totalPrice != null ? Number(item.totalPrice).toFixed(2) : '-' }}</td>
+              </tr>
+              <tr v-if="adminOrderItems.length === 0"><td colspan="5" style="text-align:center;color:#999;">暂无明细数据</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section-card page-products" v-if="section === 'products'">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:12px;">
+          <h2 style="margin:0;">{{ productSubSection === 'logs' ? '库存变动日志' : '商品管理' }}</h2>
+          <button v-if="productSubSection === 'list'" type="button" @click="categoryModalVisible = true" style="border:none;border-radius:14px;padding:8px 16px;background:#fff;color:#1e574f;border:1.5px dashed #b8cfc3;cursor:pointer;font-size:13px;font-weight:600;">管理分类</button>
+        </div>
+
+        <!-- ===== 商品列表视图 ===== -->
+        <div v-show="productSubSection === 'list'">
+        <div class="card-row">
+          <div class="stat-card"><strong>{{ filteredProducts.length }}</strong><span>{{ productSearchKeyword ? '搜索结果' : '当前商品条数' }}</span></div>
+          <div class="stat-card"><strong>第 {{ productPage }} 页</strong><span>当前分页</span></div>
+          <div class="stat-card"><strong>{{ productSize }} / 页</strong><span>每页数量</span></div>
+        </div>
+        <!-- 第二排：状态分类统计卡片（点击可筛选） -->
+        <div class="card-row">
+          <div class="stat-card clickable" :class="{ active: productStatusFilter === 'listed' }" @click="toggleStatusFilter('listed')">
+            <strong>{{ listedProductCount }}</strong><span>已上架商品</span>
+          </div>
+          <div class="stat-card clickable" :class="{ active: productStatusFilter === 'delisted' }" @click="toggleStatusFilter('delisted')">
+            <strong>{{ delistedProductCount }}</strong><span>已下架商品</span>
+          </div>
+          <div class="stat-card clickable" :class="{ active: productStatusFilter === 'outofstock', warning: outOfStockProductCount > 0 }" @click="toggleStatusFilter('outofstock')">
+            <strong>{{ outOfStockProductCount }}</strong><span>无库存商品</span>
+          </div>
+        </div>
+        <div class="toolbar">
+          <input type="text" v-model="productSearchKeyword" placeholder="搜索商品名称或ID..." @keyup.enter="productPage=1; loadProducts()" />
+          <select v-model="productCategoryFilter" @change="productPage=1; loadProducts()" style="min-width:130px;">
+            <option value="">全部分类</option>
+            <option v-for="cat in productCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+          </select>
+          <button type="button" @click="loadProducts">加载商品</button>
+          <button type="button" @click="goCreateProduct">新增商品</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th><input type="checkbox" @change="toggleSelectAllProducts" :checked="selectedProducts.length === paginatedProducts.length && paginatedProducts.length > 0" /></th>
+                <th>ID</th>
+                <th>名称</th>
+                <th>分类</th>
+                <th>价格</th>
+                <th>库存</th>
+                <th>状态</th>
+                <th>更新时间</th>
+                <th>操作</th>
+              </tr>
+              <tr v-if="selectedProducts.length > 0" class="batch-action-row">
+                <th :colspan="9">
+                  <div class="batch-action-bar">
+                    <div class="batch-left-group">
+                      <span class="batch-info">已选择 <strong>{{ selectedProducts.length }}</strong> 件商品</span>
+                      <span class="batch-sep"></span>
+                      <span class="batch-actions">
+                        <button class="btn-batch-delete" @click="confirmBatchDeleteProducts">批量删除</button>
+                      </span>
+                    </div>
+                    <button class="btn-batch-clear" @click="selectedProducts = []">取消选择</button>
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in paginatedProducts" :key="item.id">
+                <td><input type="checkbox" :value="item.id" v-model="selectedProducts" /></td>
+                <td>{{ item.id }}</td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.categoryName || '-' }}</td>
+                <td>¥{{ item.price }}</td>
+                <td>
+                  <span v-if="item.stockQuantity != null && item.stockQuantity <= 0" style="color:#c62828;font-weight:600;">已售完</span>
+                  <span v-else>{{ item.stockQuantity != null ? item.stockQuantity : '-' }}</span>
+                </td>
+                <td><span class="status-pill">{{ item.status === 1 ? '上架' : '下架' }}</span></td>
+                <td>{{ item.updateTime ? item.updateTime.replace('T', ' ') : '-' }}</td>
+                <td class="actions">
+                  <button type="button" @click="showProductForm(item)">编辑</button>
+                  <button type="button" @click="toggleProductStatus(item)">{{ item.status === 1 ? '下架' : '上架' }}</button>
+                  <button type="button" @click="deleteProduct(item)" style="background:#fff0f0; color:#c0392b;">删除</button>
+                </td>
+              </tr>
+              <tr v-if="filteredProducts.length === 0"><td colspan="9" style="padding: 22px 12px; color: #5b7267;">{{ products.length === 0 ? '暂无商品数据，点击加载商品。' : '未找到匹配的商品，请尝试其他关键词。' }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagelist">
+          <button @click="productPage=1" :disabled="productPage<=1">首页</button>
+          <button @click="productPage--" :disabled="productPage<=1">上一页</button>
+          <span>第 {{ productPage }} / {{ productTotalPages }} 页（共 {{ filteredProducts.length }} 条）</span>
+          <button @click="productPage++" :disabled="productPage>=productTotalPages">下一页</button>
+          <button @click="productPage=productTotalPages" :disabled="productPage>=productTotalPages">末页</button>
+        </div>
+        </div>
+        <!-- ===== 库存变动日志视图 ===== -->
+        <div v-show="productSubSection === 'logs'">
+          <div class="card-row">
+            <div class="stat-card"><strong>{{ filteredStockLogs.length }}</strong><span>日志条数</span></div>
+            <div class="stat-card"><strong>{{ stockLogFilter || '全部' }}</strong><span>当前筛选</span></div>
+            <div class="stat-card"><strong>{{ stockLogPage }}</strong><span>当前页码</span></div>
+          </div>
+          <div class="toolbar">
+            <input type="text" v-model="stockLogFilter" placeholder="按商品名或操作类型筛选" @keyup.enter="loadStockLogs" />
+            <button type="button" @click="loadStockLogs">刷新日志</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>记录ID</th>
+                  <th>商品</th>
+                  <th>变动数量</th>
+                  <th>操作类型</th>
+                  <th>关联信息</th>
+                  <th>备注</th>
+                  <th>时间</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in paginatedStockLogs" :key="item.id">
+                  <td>{{ item.id }}</td>
+                  <td>{{ item.productName || '商品#' + item.productId }}</td>
+                  <td>
+                    <span :style="{color: item.changeQuantity > 0 ? '#2e7d32' : '#c62828', fontWeight: 600}">
+                      {{ item.changeQuantity > 0 ? '+' : '' }}{{ item.changeQuantity }}
+                    </span>
+                  </td>
+                  <td>
+                    <span class="status-pill" v-if="item.operationType === 'ORDER'" style="background:#e3f2fd;color:#1565c0;">下单扣减</span>
+                    <span class="status-pill" v-else-if="item.operationType === 'CANCEL'" style="background:#fff3e0;color:#e65100;">取消恢复</span>
+                    <span class="status-pill" v-else-if="item.operationType === 'RESTOCK'" style="background:#e8f5e9;color:#2e7d32;">手动入库</span>
+                    <span class="status-pill" v-else-if="item.operationType === 'ADJUST'" style="background:#f3e5f5;color:#7b1fa2;">管理员调整</span>
+                    <span class="status-pill" v-else>{{ item.operationType }}</span>
+                  </td>
+                  <td>
+                    <span v-if="item.operationType === 'ORDER'">订单 #{{ item.referenceId }}</span>
+                    <span v-else-if="item.operationType === 'CANCEL'">订单 #{{ item.referenceId }}（取消）</span>
+                    <span v-else style="color:#999;">—</span>
+                  </td>
+                  <td>{{ item.remark || '-' }}</td>
+                  <td>{{ item.createTime ? item.createTime.replace('T', ' ').substring(0, 19) : '-' }}</td>
+                </tr>
+                <tr v-if="filteredStockLogs.length === 0"><td colspan="7" style="padding:22px;color:#5b7267;text-align:center;">暂无库存变动记录</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagelist" v-if="stockLogTotalPages > 1" style="margin-top:12px;">
+            <button @click="stockLogPage=1" :disabled="stockLogPage<=1">首页</button>
+            <button @click="stockLogPage--" :disabled="stockLogPage<=1">上一页</button>
+            <span>第 {{ stockLogPage }} / {{ stockLogTotalPages }} 页（共 {{ filteredStockLogs.length }} 条）</span>
+            <button @click="stockLogPage++" :disabled="stockLogPage>=stockLogTotalPages">下一页</button>
+            <button @click="stockLogPage=stockLogTotalPages" :disabled="stockLogPage>=stockLogTotalPages">末页</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 分类管理弹窗 -->
+      <div class="modal-backdrop" v-cloak v-if="categoryModalVisible" @click.self="categoryModalVisible = false" style="position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1000;">
+        <div class="modal-sm">
+          <h3>分类管理</h3>
+          <div class="form-group">
+            <label>分类名称</label>
+            <input type="text" v-model="newCategoryName" placeholder="例如：饮品、零食、文具" />
+          </div>
+          <div class="form-group">
+            <label>分类描述（可选）</label>
+            <input type="text" v-model="newCategoryDesc" placeholder="简短描述这个分类" />
+          </div>
+          <div class="form-group">
+            <label>父级分类</label>
+            <select v-model="newCategoryParentId">
+              <option :value="null">作为一级分类（无父级）</option>
+              <option v-for="cat in productCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+            </select>
+          </div>
+          <div v-if="productCategories.length > 0" style="margin-bottom:12px;">
+            <label style="font-size:13px;font-weight:600;color:#5a7267;display:block;margin-bottom:6px;">现有分类</label>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+              <span v-for="cat in productCategories" :key="cat.id" style="background:#e8f5ee;color:#1e574f;padding:4px 12px;border-radius:12px;font-size:13px;">{{ cat.name }}</span>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn-cancel" @click="categoryModalVisible = false">取消</button>
+            <button class="btn-primary" @click="createCategory">新建分类</button>
+          </div>
+        </div>
+      </div>
+      <!-- 确认操作弹窗 -->
+      <div class="modal-backdrop" v-cloak v-if="confirmModal.visible" @click.self="confirmModal.visible = false" style="position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:10000;padding:20px;">
+        <div class="confirm-modal" @click.stop>
+          <div class="confirm-icon" :class="confirmModal.type"></div>
+          <h3>{{ confirmModal.title }}</h3>
+          <p>{{ confirmModal.message }}</p>
+          <div class="confirm-detail" v-if="confirmModal.detail" v-html="confirmModal.detail"></div>
+          <div class="confirm-actions">
+            <button class="btn-cancel" @click="confirmModal.visible = false">取消</button>
+            <button
+              :class="confirmModal.type === 'danger' ? 'btn-danger-confirm' : 'btn-success-confirm'"
+              @click="confirmModal.onConfirm(); confirmModal.visible = false"
+            >{{ confirmModal.confirmText }}</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>

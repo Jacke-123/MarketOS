@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<!--
+  商品新增/编辑页面 —— 广应科校园超市管理后台
+  支持从 URL 传参 id 进入编辑模式，或留空进入新增模式。
+  功能：商品基本信息编辑、多图片上传（拖拽排序）、分类选择、上架/下架控制。
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>新增商品 - 广应科校园超市管理</title>
+  <link rel="stylesheet" href="css/admin-product.css" />
+</head>
+<body>
+  <div class="page">
+    <div class="page-header">
+      <div>
+        <h1 id="pageTitle">新增商品</h1>
+        <div class="hint">填写商品信息后提交，成功后会返回商品管理页面。</div>
+      </div>
+      <a href="admin.html#products">返回商品管理</a>
+    </div>
+    <div class="card">
+      <div class="form-row">
+        <div>
+          <label for="name">商品名称</label>
+          <input id="name" type="text" />
+        </div>
+        <div>
+          <label for="categoryId">商品分类</label>
+          <select id="categoryId">
+            <option value="">请选择分类</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label for="price">价格</label>
+          <input id="price" type="number" step="0.01" />
+        </div>
+        <div>
+          <label for="stockQuantity">库存数量</label>
+          <input id="stockQuantity" type="number" />
+        </div>
+      </div>
+      <div class="image-section">
+        <label>商品图片 <span style="font-weight:400;color:#8a9e98;">（最多5张，支持 jpg/png/gif）</span></label>
+        <input id="imageUrl" type="hidden" />
+        <div class="image-grid" id="imageGrid"></div>
+        <div class="image-input-row">
+          <button id="uploadBtn" type="button">选择图片</button>
+          <span class="image-count" id="imageCount">0/5 张</span>
+        </div>
+        <input id="imageFile" type="file" accept="image/*" multiple style="display:none" />
+      </div>
+      <div id="previewModal" class="image-preview-modal" aria-hidden="true">
+        <div class="image-preview-content">
+          <button id="previewClose" class="image-preview-close" type="button" aria-label="关闭预览">×</button>
+          <img id="previewImage" src="" alt="图片预览" />
+          <div id="previewCaption" class="image-preview-caption"></div>
+        </div>
+      </div>
+      <div class="form-row-full">
+        <label for="description">商品描述</label>
+        <textarea id="description"></textarea>
+      </div>
+      <div class="form-row">
+        <div>
+          <label for="status">状态</label>
+          <select id="status">
+            <option value="1">上架</option>
+            <option value="0">下架</option>
+          </select>
+        </div>
+        <div>
+          <label for="remark">备注（可选）</label>
+          <input id="remark" type="text" />
+        </div>
+      </div>
+      <div class="actions">
+        <button class="primary" id="submitBtn">提交</button>
+        <button class="secondary" id="cancelBtn" type="button">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="js/admin-product.js"></script>
+</body>
+</html>
